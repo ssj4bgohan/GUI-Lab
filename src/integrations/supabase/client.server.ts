@@ -41,7 +41,7 @@ function createSupabaseAdminClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_PUBLISHABLE_KEY ||
     process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    "";
+    "sb_publishable_msahQInVg4QO_dgtGhaciA_NP38HvMM";
 
   const SUPABASE_URL = rawUrl.trim().replace(/\/+$/, "");
   const SUPABASE_SERVICE_ROLE_KEY = rawKey.trim();
