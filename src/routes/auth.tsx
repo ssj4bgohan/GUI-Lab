@@ -109,23 +109,33 @@ function AuthPage() {
         return;
       }
 
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
+      if (loginErr && !loginErr.message.toLowerCase().includes("email not confirmed")) {
+        const { data: signUpData } = await supabase.auth.signUp({
+          email: data.email,
+          password: data.password,
+          options: {
+            data: {
+              full_name: data.username || username,
+            },
+          },
+        });
+
+        if (signUpData?.session) {
+          toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
+          navigate({ to: "/chat" });
+          return;
+        }
+      }
+
+      const { data: anonData, error: anonErr } = await supabase.auth.signInAnonymously({
         options: {
           data: {
             full_name: data.username || username,
+            roblox_username: data.username || username,
           },
         },
       });
 
-      if (signUpData?.session) {
-        toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
-        navigate({ to: "/chat" });
-        return;
-      }
-
-      const { data: anonData, error: anonErr } = await supabase.auth.signInAnonymously();
       if (anonData?.session) {
         toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
         navigate({ to: "/chat" });
@@ -133,7 +143,6 @@ function AuthPage() {
       }
 
       if (loginErr) throw loginErr;
-      if (signUpErr) throw signUpErr;
       if (anonErr) throw anonErr;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha na verificação");
