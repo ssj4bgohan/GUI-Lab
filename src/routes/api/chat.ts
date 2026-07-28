@@ -55,9 +55,21 @@ export const Route = createFileRoute("/api/chat")({
           ?.replace(/^Bearer\s+/i, "");
         if (!token) return new Response("Unauthorized", { status: 401 });
 
+        const supabaseUrl = (
+          process.env.SUPABASE_URL ||
+          process.env.VITE_SUPABASE_URL ||
+          "https://fvjewtcidvjiinhngjf.supabase.co"
+        ).trim().replace(/\/+$/, "");
+
+        const supabaseKey = (
+          process.env.SUPABASE_PUBLISHABLE_KEY ||
+          process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+          "sb_publishable_msahQInVg4QO_dgtGhaciA_NP38HvMM"
+        ).trim();
+
         const supabase = createClient(
-          process.env.SUPABASE_URL!,
-          process.env.SUPABASE_PUBLISHABLE_KEY!,
+          supabaseUrl,
+          supabaseKey,
           {
             auth: { persistSession: false, autoRefreshToken: false },
             global: { headers: { Authorization: `Bearer ${token}` } },
