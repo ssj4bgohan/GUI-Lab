@@ -140,10 +140,14 @@ export async function generateGuiAsset(
 
     if (isGemini) {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(apiKey)}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            "api-key": apiKey,
+          },
           body: JSON.stringify({
             instances: [{ prompt: enriched }],
             parameters: { sampleCount: 1, aspectRatio: "1:1", outputMimeType: "image/png" },
