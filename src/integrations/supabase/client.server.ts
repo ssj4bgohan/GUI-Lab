@@ -5,39 +5,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-function isNewSupabaseApiKey(value: string): boolean {
-  return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
-}
-
-function createSupabaseFetch(supabaseKey: string): typeof fetch {
-  return async (input, init) => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-        ? input.toString()
-        : (input as Request).url;
-
-    const headers = new Headers(init?.headers);
-
-    if (isNewSupabaseApiKey(supabaseKey)) {
-      const auth = headers.get("Authorization");
-      if (auth && auth.includes(supabaseKey)) {
-        headers.delete("Authorization");
-      }
-    }
-
-    headers.set("apikey", supabaseKey);
-
-    return fetch(url, {
-      method: init?.method,
-      headers,
-      body: init?.body,
-      signal: init?.signal,
-    });
-  };
-}
-
 function createSupabaseAdminClient() {
   const rawUrl =
     process.env.SUPABASE_URL ||
@@ -59,9 +26,6 @@ function createSupabaseAdminClient() {
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    global: {
-      fetch: createSupabaseFetch(SUPABASE_SERVICE_ROLE_KEY),
-    },
     auth: {
       storage: undefined,
       persistSession: false,
