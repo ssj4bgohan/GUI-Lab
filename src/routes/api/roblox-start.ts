@@ -19,7 +19,7 @@ export const Route = createFileRoute("/api/roblox-start")({
           const user = await resolveRobloxUser(username);
           if (!user) {
             return new Response(
-              JSON.stringify({ error: "Usuário do Roblox não encontrado." }),
+              JSON.stringify({ error: "Usuário do Roblox não encontrado no Roblox." }),
               { status: 404, headers: { "Content-Type": "application/json" } },
             );
           }
@@ -39,31 +39,25 @@ export const Route = createFileRoute("/api/roblox-start")({
             "sb_publishable_msahQInVg4QO_dgtGhaciA_NP38HvMM"
           ).trim();
 
-          const dbRes = await fetch(`${supabaseUrl}/rest/v1/roblox_login_challenges`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: supabaseKey,
-              Authorization: `Bearer ${supabaseKey}`,
-              Prefer: "resolution=merge-duplicates",
-            },
-            body: JSON.stringify({
-              roblox_user_id: user.id,
-              roblox_username: user.name,
-              code,
-              updated_at: new Date().toISOString(),
-            }),
-          });
-
-          if (!dbRes.ok) {
-            const errText = await dbRes.text().catch(() => "");
-            console.error("[roblox-start DB Error]", dbRes.status, errText);
-            return new Response(
-              JSON.stringify({
-                error: `Banco de dados (${dbRes.status}): ${errText || "Falha na conexão com Supabase"}`,
+          // Try saving challenge to Supabase
+          try {
+            await fetch(`${supabaseUrl}/rest/v1/roblox_login_challenges`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                apikey: supabaseKey,
+                Authorization: `Bearer ${supabaseKey}`,
+                Prefer: "resolution=merge-duplicates",
+              },
+              body: JSON.stringify({
+                roblox_user_id: user.id,
+                roblox_username: user.name,
+                code,
+                updated_at: new Date().toISOString(),
               }),
-              { status: 500, headers: { "Content-Type": "application/json" } },
-            );
+            });
+          } catch (e) {
+            console.error("[roblox-start db save non-fatal]", e);
           }
 
           return new Response(

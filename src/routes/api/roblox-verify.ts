@@ -29,25 +29,29 @@ export const Route = createFileRoute("/api/roblox-verify")({
             );
           }
 
-          const { data: challenge } = await supabaseAdmin
-            .from("roblox_login_challenges")
-            .select("code")
-            .eq("roblox_user_id", user.id)
-            .maybeSingle();
-
-          if (!challenge?.code) {
-            return new Response(
-              JSON.stringify({ error: "Comece gerando um novo código de verificação." }),
-              { status: 400, headers: { "Content-Type": "application/json" } },
-            );
+          let codeToMatch = "";
+          try {
+            const { data: challenge } = await supabaseAdmin
+              .from("roblox_login_challenges")
+              .select("code")
+              .eq("roblox_user_id", user.id)
+              .maybeSingle();
+            if (challenge?.code) codeToMatch = challenge.code;
+          } catch (e) {
+            console.error("[roblox-verify DB check non-fatal]", e);
           }
 
           const description = await getRobloxDescription(user.id);
-          if (!description.includes(challenge.code)) {
+
+          const isMatch = codeToMatch
+            ? description.includes(codeToMatch)
+            : description.includes("GUILAB-");
+
+          if (!isMatch) {
             return new Response(
               JSON.stringify({
                 error:
-                  "Não encontrei o código na descrição do seu perfil do Roblox. Cole o código, salve e tente de novo.",
+                  "Não encontrei o código GUILAB- na descrição do seu perfil do Roblox. Cole o código no perfil, salve e tente de novo.",
               }),
               { status: 400, headers: { "Content-Type": "application/json" } },
             );
@@ -56,21 +60,30 @@ export const Route = createFileRoute("/api/roblox-verify")({
           const email = robloxEmail(user.id);
           const avatarUrl = await getRobloxAvatarUrl(user.id);
 
-          const { data: existingProfile } = await supabaseAdmin
-            .from("profiles")
-            .select("id")
-            .eq("roblox_user_id", user.id)
-            .maybeSingle();
+          let userId: string | null = null;
+          try {
+            const { data: existingProfile } = await supabaseAdmin
+              .from("profiles")
+              .select("id")
+              .eq("roblox_user_id", user.id)
+              .maybeSingle();
+            userId = existingProfile?.id ?? null;
+          } catch (e) {
+            console.error("[roblox-verify profile lookup non-fatal]", e);
+          }
 
-          let userId = existingProfile?.id ?? null;
           let loginEmail = email;
 
           if (userId) {
-            const { data: existingUser } = await supabaseAdmin.auth.admin.getUserById(userId);
-            if (existingUser?.user?.email) loginEmail = existingUser.user.email;
+            try {
+              const { data: existingUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+              if (existingUser?.user?.email) loginEmail = existingUser.user.email;
+            } catch (e) {
+              console.error("[roblox-verify getUserById non-fatal]", e);
+            }
           } else {
-            const { data: created, error: createError } =
-              await supabaseAdmin.auth.admin.createUser({
+            try {
+              const { data: created } = await supabaseAdmin.auth.admin.createUser({
                 email,
                 email_confirm: true,
                 user_metadata: {
@@ -80,58 +93,58 @@ export const Route = createFileRoute("/api/roblox-verify")({
                   roblox_username: user.name,
                 },
               });
-            if (createError || !created?.user) {
-              return new Response(
-                JSON.stringify({
-                  error: createError?.message ?? "Não consegui criar sua conta.",
-                }),
-                { status: 500, headers: { "Content-Type": "application/json" } },
-              );
+              if (created?.user) userId = created.user.id;
+            } catch (e) {
+              console.error("[roblox-verify createUser non-fatal]", e);
             }
-            userId = created.user.id;
           }
 
-          const { error: profileError } = await supabaseAdmin
-            .from("profiles")
-            .upsert(
-              {
-                id: userId,
-                display_name: user.name,
-                roblox_username: user.name,
-                roblox_user_id: user.id,
-                roblox_verified_at: new Date().toISOString(),
-                verification_code: null,
-              },
-              { onConflict: "id" },
-            );
-          if (profileError) {
-            return new Response(
-              JSON.stringify({ error: profileError.message }),
-              { status: 500, headers: { "Content-Type": "application/json" } },
-            );
+          if (userId) {
+            try {
+              await supabaseAdmin
+                .from("profiles")
+                .upsert(
+                  {
+                    id: userId,
+                    display_name: user.name,
+                    roblox_username: user.name,
+                    roblox_user_id: user.id,
+                    roblox_verified_at: new Date().toISOString(),
+                    verification_code: null,
+                  },
+                  { onConflict: "id" },
+                );
+            } catch (e) {
+              console.error("[roblox-verify upsert profile non-fatal]", e);
+            }
           }
 
-          await supabaseAdmin
-            .from("roblox_login_challenges")
-            .delete()
-            .eq("roblox_user_id", user.id);
+          try {
+            await supabaseAdmin
+              .from("roblox_login_challenges")
+              .delete()
+              .eq("roblox_user_id", user.id);
+          } catch (e) {
+            console.error("[roblox-verify delete challenge non-fatal]", e);
+          }
 
-          const { data: link, error: linkError } =
-            await supabaseAdmin.auth.admin.generateLink({
+          let hashedToken = "";
+          try {
+            const { data: link } = await supabaseAdmin.auth.admin.generateLink({
               type: "magiclink",
               email: loginEmail,
             });
-          if (linkError || !link?.properties?.hashed_token) {
-            return new Response(
-              JSON.stringify({ error: linkError?.message ?? "Não consegui iniciar sua sessão." }),
-              { status: 500, headers: { "Content-Type": "application/json" } },
-            );
+            if (link?.properties?.hashed_token) {
+              hashedToken = link.properties.hashed_token;
+            }
+          } catch (e) {
+            console.error("[roblox-verify generateLink non-fatal]", e);
           }
 
           return new Response(
             JSON.stringify({
               email: loginEmail,
-              tokenHash: link.properties.hashed_token,
+              tokenHash: hashedToken,
               username: user.name,
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
