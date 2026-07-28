@@ -37,8 +37,6 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const startLogin = useServerFn(robloxLoginStart);
-  const verifyLogin = useServerFn(robloxLoginVerify);
 
   const [username, setUsername] = useState("");
   const [code, setCode] = useState<string | null>(null);
@@ -55,52 +53,21 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      let resolvedUsername = username.trim();
-      let resolvedUserId: number | null = null;
-
-      try {
-        const res = await fetch("https://users.roblox.com/v1/usernames/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ usernames: [resolvedUsername], excludeBannedUsers: true }),
-        });
-        if (res.ok) {
-          const json = (await res.json()) as { data?: Array<{ id: number; name: string }> };
-          const u = json?.data?.[0];
-          if (u) {
-            resolvedUsername = u.name;
-            resolvedUserId = u.id;
-          }
-        }
-      } catch {
-        // Fallback to server function if CORS/client fetch fails
+      const res = await fetch("/api/roblox-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        username?: string;
+        code?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.code) {
+        throw new Error(data.error || "Falha ao consultar usuário no servidor");
       }
-
-      const generatedCode = `GUILAB-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-
-      if (resolvedUserId) {
-        const { error } = await supabase
-          .from("roblox_login_challenges")
-          .upsert(
-            {
-              roblox_user_id: resolvedUserId,
-              roblox_username: resolvedUsername,
-              code: generatedCode,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "roblox_user_id" },
-          );
-
-        if (!error) {
-          setUsername(resolvedUsername);
-          setCode(generatedCode);
-          return;
-        }
-      }
-
-      const result = await startLogin({ data: { username } });
-      setUsername(result.username);
-      setCode(result.code);
+      setUsername(data.username || username);
+      setCode(data.code);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao gerar o código");
     } finally {
@@ -111,13 +78,25 @@ function AuthPage() {
   async function handleVerify() {
     setLoading(true);
     try {
-      const result = await verifyLogin({ data: { username } });
+      const res = await fetch("/api/roblox-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        username?: string;
+        tokenHash?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.tokenHash) {
+        throw new Error(data.error || "Falha na verificação no servidor");
+      }
       const { error } = await supabase.auth.verifyOtp({
         type: "magiclink",
-        token_hash: result.tokenHash,
+        token_hash: data.tokenHash,
       });
       if (error) throw error;
-      toast.success(`Bem-vindo, ${result.username}!`);
+      toast.success(`Bem-vindo, ${data.username || username}!`);
       navigate({ to: "/chat" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha na verificação");
