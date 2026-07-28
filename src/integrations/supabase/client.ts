@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 function createSupabaseClient() {
-  const SUPABASE_URL = "https://fvjewtcidvjiinhngjf.supabase.co";
+  const SUPABASE_URL = "https://fvjewtciddvjiinhngjf.supabase.co";
   const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_msahQInVg4QO_dgtGhaciA_NP38HvMM";
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -25,4 +25,3 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     return Reflect.get(_supabase, prop, receiver);
   },
 });
-

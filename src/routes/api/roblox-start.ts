@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/roblox-start")({
           const supabaseUrl = (
             process.env.SUPABASE_URL ||
             process.env.VITE_SUPABASE_URL ||
-            "https://fvjewtcidvjiinhngjf.supabase.co"
+            "https://fvjewtciddvjiinhngjf.supabase.co"
           ).trim().replace(/\/+$/, "");
 
           const supabaseKey = (

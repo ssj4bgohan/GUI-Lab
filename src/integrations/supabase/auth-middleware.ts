@@ -4,14 +4,12 @@ import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
 
-
-
 export const requireSupabaseAuth = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
     const SUPABASE_URL = (
       process.env.SUPABASE_URL ||
       process.env.VITE_SUPABASE_URL ||
-      "https://fvjewtcidvjiinhngjf.supabase.co"
+      "https://fvjewtciddvjiinhngjf.supabase.co"
     ).trim().replace(/\/+$/, "");
 
     const SUPABASE_PUBLISHABLE_KEY = (
