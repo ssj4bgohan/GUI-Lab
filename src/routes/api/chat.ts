@@ -211,82 +211,91 @@ export const Route = createFileRoute("/api/chat")({
 - userPrompt: ${lastAsset.user_prompt}`
           : "";
 
-        const result = streamText({
-          model: aiModel,
-          system: `${SYSTEM_PROMPT}${lastAssetContext}
+        try {
+          const result = streamText({
+            model: aiModel,
+            system: `${SYSTEM_PROMPT}${lastAssetContext}
 
 IMPORTANTE: escreva TODAS as suas respostas ao usuário em ${languageName}, independentemente do idioma em que ele escrever. Os prompts enviados para a ferramenta generate_asset continuam sempre em inglês.`,
 
-          messages: await convertToModelMessages(messages),
-          stopWhen: stepCountIs(50),
-          tools: {
-            generate_asset: tool({
-              description:
-                "Gera um asset visual para Roblox (GUI, modelo 3D, thumbnail, camisa ou calça) e devolve a imagem PNG. Custa 1 crédito.",
-              inputSchema: z.object({
-                kind: z.enum(
-                  ASSET_KINDS.map((k) => k.value) as [string, ...string[]],
-                ),
-                userPrompt: z
-                  .string()
-                  .describe("Descrição detalhada do asset, em inglês."),
-                style: z
-                  .enum(GUI_STYLES.map((s) => s.value) as [string, ...string[]])
-                  .nullable()
-                  .describe("Somente para kind 'gui'."),
-                elementType: z
-                  .enum(GUI_ELEMENTS.map((s) => s.value) as [string, ...string[]])
-                  .nullable()
-                  .describe("Somente para kind 'gui'."),
-                primaryColor: z.string().nullable().describe("Hex #RRGGBB"),
-                borderColor: z.string().nullable().describe("Hex #RRGGBB"),
-                transparent: z
-                  .boolean()
-                  .describe("true quando o usuário quer fundo transparente/recorte."),
+            messages: await convertToModelMessages(messages),
+            stopWhen: stepCountIs(50),
+            tools: {
+              generate_asset: tool({
+                description:
+                  "Gera um asset visual para Roblox (GUI, modelo 3D, thumbnail, camisa ou calça) e devolve a imagem PNG. Custa 1 crédito.",
+                inputSchema: z.object({
+                  kind: z.enum(
+                    ASSET_KINDS.map((k) => k.value) as [string, ...string[]],
+                  ),
+                  userPrompt: z
+                    .string()
+                    .describe("Descrição detalhada do asset, em inglês."),
+                  style: z
+                    .enum(GUI_STYLES.map((s) => s.value) as [string, ...string[]])
+                    .nullable()
+                    .describe("Somente para kind 'gui'."),
+                  elementType: z
+                    .enum(GUI_ELEMENTS.map((s) => s.value) as [string, ...string[]])
+                    .nullable()
+                    .describe("Somente para kind 'gui'."),
+                  primaryColor: z.string().nullable().describe("Hex #RRGGBB"),
+                  borderColor: z.string().nullable().describe("Hex #RRGGBB"),
+                  transparent: z
+                    .boolean()
+                    .describe("true quando o usuário quer fundo transparente/recorte."),
+                }),
+                execute: async (input) => {
+                  try {
+                    const asset = await generateGuiAsset({
+                      kind: input.kind as never,
+                      userPrompt: input.userPrompt,
+                      style: (input.style ?? undefined) as never,
+                      elementType: (input.elementType ?? undefined) as never,
+                      primaryColor: input.primaryColor,
+                      borderColor: input.borderColor,
+                      transparent: input.transparent,
+                      referenceImage,
+                      userId: user.id,
+                      threadId,
+                    });
+                    return {
+                      ok: true as const,
+                      assetId: asset.id,
+                      url: asset.url,
+                      kind: asset.asset_kind,
+                      style: asset.style_used,
+                      elementType: asset.element_type,
+                      enrichedPrompt: asset.enriched_prompt,
+                      creditsLeft: asset.creditsLeft,
+                      transparent: input.transparent,
+                    };
+                  } catch (error) {
+                    return {
+                      ok: false as const,
+                      error:
+                        error instanceof Error ? error.message : "Erro desconhecido",
+                    };
+                  }
+                },
               }),
-              execute: async (input) => {
-                try {
-                  const asset = await generateGuiAsset({
-                    kind: input.kind as never,
-                    userPrompt: input.userPrompt,
-                    style: (input.style ?? undefined) as never,
-                    elementType: (input.elementType ?? undefined) as never,
-                    primaryColor: input.primaryColor,
-                    borderColor: input.borderColor,
-                    transparent: input.transparent,
-                    referenceImage,
-                    userId: user.id,
-                    threadId,
-                  });
-                  return {
-                    ok: true as const,
-                    assetId: asset.id,
-                    url: asset.url,
-                    kind: asset.asset_kind,
-                    style: asset.style_used,
-                    elementType: asset.element_type,
-                    enrichedPrompt: asset.enriched_prompt,
-                    creditsLeft: asset.creditsLeft,
-                    transparent: input.transparent,
-                  };
-                } catch (error) {
-                  return {
-                    ok: false as const,
-                    error:
-                      error instanceof Error ? error.message : "Erro desconhecido",
-                  };
-                }
-              },
-            }),
-          },
-        });
+            },
+          });
 
-        return result.toUIMessageStreamResponse({
-          originalMessages: messages,
-          onFinish: async ({ responseMessage }) => {
-            if (responseMessage) await saveMessage(responseMessage);
-          },
-        });
+          return result.toUIMessageStreamResponse({
+            originalMessages: messages,
+            onFinish: async ({ responseMessage }) => {
+              if (responseMessage) await saveMessage(responseMessage);
+            },
+          });
+        } catch (error) {
+          console.error("[chat.ts error]", error);
+          const msg = error instanceof Error ? error.message : String(error);
+          return new Response(JSON.stringify({ error: msg }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
       },
     },
   },
