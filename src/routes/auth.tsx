@@ -98,30 +98,28 @@ function AuthPage() {
         );
       }
 
-      let { error: authErr } = await supabase.auth.signInWithPassword({
+      const { data: signUpData } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.username || username,
+          },
+        },
+      });
+
+      if (signUpData?.session) {
+        toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
+        navigate({ to: "/chat" });
+        return;
+      }
+
+      const { error: loginErr } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       });
 
-      if (authErr) {
-        const { error: signUpErr } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-          options: {
-            data: {
-              full_name: data.username || username,
-            },
-          },
-        });
-        if (signUpErr && !signUpErr.message.toLowerCase().includes("already registered")) {
-          throw signUpErr;
-        }
-        const { error: secondLoginErr } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
-        });
-        if (secondLoginErr) throw secondLoginErr;
-      }
+      if (loginErr) throw loginErr;
 
       toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
       navigate({ to: "/chat" });
