@@ -67,7 +67,17 @@ async function authedFetch(input: RequestInfo | URL, init?: RequestInit) {
   if (data.session?.access_token) {
     headers.set("Authorization", `Bearer ${data.session.access_token}`);
   }
-  return fetch(input, { ...init, headers });
+  const res = await fetch(input, { ...init, headers });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let errorMsg = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.error) errorMsg = parsed.error;
+    } catch {}
+    throw new Error(errorMsg || `Erro no servidor (HTTP ${res.status})`);
+  }
+  return res;
 }
 
 /** Attachment strip + picker (AI Elements ships no attachment preview primitive). */
