@@ -92,16 +92,18 @@ export function makeVerificationCode(): string {
 export async function getRobloxAvatarUrl(userId: number): Promise<string | null> {
   try {
     const res = await fetch(
-      `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=true`,
+      `https://thumbnails.roblox.com/v1/users/avatar-headshots?userIds=${userId}&size=150x150&format=Png&isCircular=true`,
       { headers: ROBLOX_HEADERS },
     );
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      data?: Array<{ imageUrl?: string; state?: string }>;
-    };
-    const item = json.data?.[0];
-    return item?.imageUrl ?? null;
+    if (res.ok) {
+      const json = (await res.json()) as {
+        data?: Array<{ imageUrl?: string; state?: string }>;
+      };
+      const item = json.data?.[0];
+      if (item?.imageUrl) return item.imageUrl;
+    }
   } catch {
-    return null;
+    // fallback below
   }
+  return `https://www.roblox.com/headshot-thumbnail/image?userId=${userId}&width=150&height=150&format=png`;
 }

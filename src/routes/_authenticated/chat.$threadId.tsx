@@ -118,6 +118,14 @@ function ChatThreadPage() {
   }
 
   const account = accountQuery.data;
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  const displayAvatarUrl =
+    !avatarFailed && account?.avatarUrl
+      ? account.avatarUrl
+      : !avatarFailed && account?.robloxUserId
+        ? `https://www.roblox.com/headshot-thumbnail/image?userId=${account.robloxUserId}&width=150&height=150&format=png`
+        : null;
 
   const sidebar = (
     <div className="flex h-full flex-col">
@@ -178,14 +186,15 @@ function ChatThreadPage() {
         </a>
         <div className="mt-1 flex items-center gap-2 rounded-md border border-border bg-secondary/30 px-2 py-2">
           <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-xs font-semibold text-primary">
-            {account?.avatarUrl ? (
+            {displayAvatarUrl ? (
               <img
-                src={account.avatarUrl}
-                alt={account.displayName ?? "Foto de perfil"}
+                src={displayAvatarUrl}
+                alt={account?.displayName ?? "Foto de perfil"}
                 className="size-full object-cover"
                 width={32}
                 height={32}
                 referrerPolicy="no-referrer"
+                onError={() => setAvatarFailed(true)}
               />
             ) : (
               (account?.displayName ?? account?.email ?? "?")
