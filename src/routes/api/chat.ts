@@ -98,8 +98,8 @@ export const Route = createFileRoute("/api/chat")({
           .maybeSingle();
         if (!thread) return new Response("Thread not found", { status: 404 });
 
-        const apiKey = process.env.LOVABLE_API_KEY;
-        if (!apiKey) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
+        const apiKey = process.env.LOVABLE_API_KEY || process.env.VITE_LOVABLE_API_KEY;
+        if (!apiKey) return new Response("Missing LOVABLE_API_KEY em Variáveis de Ambiente da Cloudflare", { status: 500 });
 
         const lastUser = [...messages].reverse().find((m) => m.role === "user");
         const lastUserText = lastUser

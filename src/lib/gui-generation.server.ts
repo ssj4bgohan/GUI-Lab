@@ -99,8 +99,8 @@ async function refundCredit(userId: string) {
 export async function generateGuiAsset(
   args: GenerateAssetArgs,
 ): Promise<GeneratedAsset> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("AI is not configured yet.");
+  const apiKey = process.env.LOVABLE_API_KEY || process.env.VITE_LOVABLE_API_KEY;
+  if (!apiKey) throw new Error("AI is not configured yet. Configure LOVABLE_API_KEY no painel da Cloudflare.");
 
   const enriched = enrichAssetPrompt({
     kind: args.kind,
