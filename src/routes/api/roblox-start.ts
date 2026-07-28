@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveRobloxUser, makeVerificationCode } from "@/lib/roblox.server";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const Route = createFileRoute("/api/roblox-start")({
   server: {
@@ -27,22 +26,42 @@ export const Route = createFileRoute("/api/roblox-start")({
 
           const code = makeVerificationCode();
 
-          const { error } = await supabaseAdmin
-            .from("roblox_login_challenges")
-            .upsert(
-              {
-                roblox_user_id: user.id,
-                roblox_username: user.name,
-                code,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: "roblox_user_id" },
-            );
+          const supabaseUrl = (
+            process.env.SUPABASE_URL ||
+            process.env.VITE_SUPABASE_URL ||
+            "https://fvjewtcidvjiinhngjf.supabase.co"
+          ).trim().replace(/\/+$/, "");
 
-          if (error) {
-            console.error("[roblox-start DB Error]", error);
+          const supabaseKey = (
+            process.env.SUPABASE_SERVICE_ROLE_KEY ||
+            process.env.SUPABASE_PUBLISHABLE_KEY ||
+            process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+            "sb_publishable_msahQInVg4QO_dgtGhaciA_NP38HvMM"
+          ).trim();
+
+          const dbRes = await fetch(`${supabaseUrl}/rest/v1/roblox_login_challenges`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: supabaseKey,
+              Authorization: `Bearer ${supabaseKey}`,
+              Prefer: "resolution=merge-duplicates",
+            },
+            body: JSON.stringify({
+              roblox_user_id: user.id,
+              roblox_username: user.name,
+              code,
+              updated_at: new Date().toISOString(),
+            }),
+          });
+
+          if (!dbRes.ok) {
+            const errText = await dbRes.text().catch(() => "");
+            console.error("[roblox-start DB Error]", dbRes.status, errText);
             return new Response(
-              JSON.stringify({ error: `Banco de dados: ${error.message}` }),
+              JSON.stringify({
+                error: `Banco de dados (${dbRes.status}): ${errText || "Falha na conexão com Supabase"}`,
+              }),
               { status: 500, headers: { "Content-Type": "application/json" } },
             );
           }
