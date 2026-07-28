@@ -12,29 +12,34 @@ export const robloxLoginStart = createServerFn({ method: "POST" })
     z.object({ username: z.string().trim().min(3).max(20) }).parse(input),
   )
   .handler(async ({ data }) => {
-    const { resolveRobloxUser, makeVerificationCode } = await import(
-      "@/lib/roblox.server"
-    );
-    const user = await resolveRobloxUser(data.username);
-    if (!user) throw new Error("Usuário do Roblox não encontrado.");
-
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const code = makeVerificationCode();
-
-    const { error } = await supabaseAdmin
-      .from("roblox_login_challenges")
-      .upsert(
-        {
-          roblox_user_id: user.id,
-          roblox_username: user.name,
-          code,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "roblox_user_id" },
+    try {
+      const { resolveRobloxUser, makeVerificationCode } = await import(
+        "@/lib/roblox.server"
       );
-    if (error) throw new Error(error.message);
+      const user = await resolveRobloxUser(data.username);
+      if (!user) throw new Error("Usuário do Roblox não encontrado.");
 
-    return { username: user.name, robloxUserId: user.id, code };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const code = makeVerificationCode();
+
+      const { error } = await supabaseAdmin
+        .from("roblox_login_challenges")
+        .upsert(
+          {
+            roblox_user_id: user.id,
+            roblox_username: user.name,
+            code,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "roblox_user_id" },
+        );
+      if (error) throw new Error(`Banco de dados: ${error.message}`);
+
+      return { username: user.name, robloxUserId: user.id, code };
+    } catch (err) {
+      console.error("[robloxLoginStart]", err);
+      throw new Error(err instanceof Error ? err.message : "Falha ao consultar usuário do Roblox");
+    }
   });
 
 export const robloxLoginVerify = createServerFn({ method: "POST" })

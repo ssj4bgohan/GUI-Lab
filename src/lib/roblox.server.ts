@@ -8,22 +8,49 @@ const ROBLOX_HEADERS = {
 export async function resolveRobloxUser(
   username: string,
 ): Promise<{ id: number; name: string } | null> {
+  // Method 1: POST usernames/users
   try {
     const res = await fetch("https://users.roblox.com/v1/usernames/users", {
       method: "POST",
       headers: ROBLOX_HEADERS,
       body: JSON.stringify({ usernames: [username], excludeBannedUsers: true }),
     });
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      data?: Array<{ id: number; name: string }>;
-    };
-    const user = json.data?.[0];
-    return user ? { id: user.id, name: user.name } : null;
+    if (res.ok) {
+      const json = (await res.json()) as {
+        data?: Array<{ id: number; name: string }>;
+      };
+      const user = json.data?.[0];
+      if (user) return { id: user.id, name: user.name };
+    }
   } catch (error) {
-    console.error("[Roblox API] Error resolving username:", error);
-    return null;
+    console.error("[Roblox API] Error in POST usernames/users:", error);
   }
+
+  // Method 2: GET users/search fallback
+  try {
+    const searchRes = await fetch(
+      `https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(
+        username,
+      )}&limit=10`,
+      { headers: ROBLOX_HEADERS },
+    );
+    if (searchRes.ok) {
+      const searchJson = (await searchRes.json()) as {
+        data?: Array<{ id: number; name: string }>;
+      };
+      const exactMatch = searchJson.data?.find(
+        (u) => u.name.toLowerCase() === username.toLowerCase(),
+      );
+      if (exactMatch) return { id: exactMatch.id, name: exactMatch.name };
+      if (searchJson.data?.[0]) {
+        return { id: searchJson.data[0].id, name: searchJson.data[0].name };
+      }
+    }
+  } catch (error) {
+    console.error("[Roblox API] Error in GET search fallback:", error);
+  }
+
+  return null;
 }
 
 export async function getRobloxDescription(userId: number): Promise<string> {
