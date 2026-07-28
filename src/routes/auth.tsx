@@ -98,7 +98,18 @@ function AuthPage() {
         );
       }
 
-      const { data: signUpData } = await supabase.auth.signUp({
+      let { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (loginData?.session) {
+        toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
+        navigate({ to: "/chat" });
+        return;
+      }
+
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
@@ -114,15 +125,16 @@ function AuthPage() {
         return;
       }
 
-      const { error: loginErr } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
+      const { data: anonData, error: anonErr } = await supabase.auth.signInAnonymously();
+      if (anonData?.session) {
+        toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
+        navigate({ to: "/chat" });
+        return;
+      }
 
       if (loginErr) throw loginErr;
-
-      toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
-      navigate({ to: "/chat" });
+      if (signUpErr) throw signUpErr;
+      if (anonErr) throw anonErr;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha na verificação");
     } finally {

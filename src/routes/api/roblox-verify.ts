@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { resolveRobloxUser, getRobloxDescription } from "@/lib/roblox.server";
 
 function robloxEmail(robloxUserId: number) {
-  return `roblox_${robloxUserId}@guilab.app`;
+  return `roblox.user.${robloxUserId}@gmail.com`;
 }
 
 function robloxPassword(robloxUserId: number) {
