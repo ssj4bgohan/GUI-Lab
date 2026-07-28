@@ -55,6 +55,49 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      let resolvedUsername = username.trim();
+      let resolvedUserId: number | null = null;
+
+      try {
+        const res = await fetch("https://users.roblox.com/v1/usernames/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usernames: [resolvedUsername], excludeBannedUsers: true }),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { data?: Array<{ id: number; name: string }> };
+          const u = json?.data?.[0];
+          if (u) {
+            resolvedUsername = u.name;
+            resolvedUserId = u.id;
+          }
+        }
+      } catch {
+        // Fallback to server function if CORS/client fetch fails
+      }
+
+      const generatedCode = `GUILAB-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+      if (resolvedUserId) {
+        const { error } = await supabase
+          .from("roblox_login_challenges")
+          .upsert(
+            {
+              roblox_user_id: resolvedUserId,
+              roblox_username: resolvedUsername,
+              code: generatedCode,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "roblox_user_id" },
+          );
+
+        if (!error) {
+          setUsername(resolvedUsername);
+          setCode(generatedCode);
+          return;
+        }
+      }
+
       const result = await startLogin({ data: { username } });
       setUsername(result.username);
       setCode(result.code);
