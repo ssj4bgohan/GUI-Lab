@@ -19,26 +19,57 @@ export const robloxLoginStart = createServerFn({ method: "POST" })
       const user = await resolveRobloxUser(data.username);
       if (!user) throw new Error("Usuário do Roblox não encontrado.");
 
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const code = makeVerificationCode();
 
-      const { error } = await supabaseAdmin
-        .from("roblox_login_challenges")
-        .upsert(
-          {
-            roblox_user_id: user.id,
-            roblox_username: user.name,
-            code,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "roblox_user_id" },
-        );
-      if (error) throw new Error(`Banco de dados: ${error.message}`);
+      const url = "https://fvjewtcidvjiinhngjf.supabase.co/rest/v1/roblox_login_challenges";
+      const key = (
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SUPABASE_PUBLISHABLE_KEY ||
+        process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+        "sb_publishable_msahQInVg4QO_dgtGhaciA_NP38HvMM"
+      ).trim();
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          Prefer: "resolution=merge-duplicates",
+        },
+        body: JSON.stringify({
+          roblox_user_id: user.id,
+          roblox_username: user.name,
+          code,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        console.error("[robloxLoginStart REST Error]", res.status, errText);
+        // Fallback: try supabaseAdmin
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { error } = await supabaseAdmin
+          .from("roblox_login_challenges")
+          .upsert(
+            {
+              roblox_user_id: user.id,
+              roblox_username: user.name,
+              code,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "roblox_user_id" },
+          );
+        if (error) throw new Error(`Status ${res.status}: ${errText || error.message}`);
+      }
 
       return { username: user.name, robloxUserId: user.id, code };
     } catch (err) {
-      console.error("[robloxLoginStart]", err);
-      throw new Error(err instanceof Error ? err.message : "Falha ao consultar usuário do Roblox");
+      console.error("[robloxLoginStart Exception]", err);
+      throw new Error(
+        err instanceof Error ? err.message : "Falha ao consultar usuário do Roblox",
+      );
     }
   });
 
