@@ -13,6 +13,16 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    ssr: {
+      external: [
+        "shiki",
+        "mermaid",
+        "@streamdown/code",
+        "@streamdown/mermaid",
+        "@streamdown/math",
+        "katex",
+      ],
+    },
     build: {
       chunkSizeWarningLimit: 2000,
     },

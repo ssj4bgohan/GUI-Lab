@@ -12,10 +12,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
-import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
 import type { UIMessage } from "ai";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
@@ -321,19 +317,35 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
-const streamdownPlugins = { cjk, code, math, mermaid };
-
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => (
-    <Streamdown
-      className={cn(
-        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-        className
-      )}
-      plugins={streamdownPlugins}
-      {...props}
-    />
-  ),
+  ({ className, plugins, ...props }: MessageResponseProps) => {
+    const [activePlugins, setActivePlugins] = useState<any>(plugins);
+
+    useEffect(() => {
+      if (!plugins && !activePlugins && typeof window !== "undefined") {
+        const load = (pkg: string) => import(/* @vite-ignore */ pkg);
+        Promise.all([
+          load("@streamdown/cjk").then((m) => m.cjk),
+          load("@streamdown/code").then((m) => m.code),
+          load("@streamdown/math").then((m) => m.math),
+          load("@streamdown/mermaid").then((m) => m.mermaid),
+        ]).then(([cjk, code, math, mermaid]) => {
+          setActivePlugins({ cjk, code, math, mermaid });
+        }).catch(() => {});
+      }
+    }, [plugins, activePlugins]);
+
+    return (
+      <Streamdown
+        className={cn(
+          "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+          className
+        )}
+        plugins={activePlugins}
+        {...props}
+      />
+    );
+  },
   (prevProps, nextProps) =>
     prevProps.children === nextProps.children &&
     nextProps.isAnimating === prevProps.isAnimating
