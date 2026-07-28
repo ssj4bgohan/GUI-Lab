@@ -14,3 +14,11 @@ export function createLovableAiGatewayProvider(
     },
   });
 }
+
+export function createGeminiProvider(apiKey: string) {
+  return createOpenAICompatible({
+    name: "gemini",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    apiKey,
+  });
+}

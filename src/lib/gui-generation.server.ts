@@ -99,8 +99,17 @@ async function refundCredit(userId: string) {
 export async function generateGuiAsset(
   args: GenerateAssetArgs,
 ): Promise<GeneratedAsset> {
-  const apiKey = process.env.LOVABLE_API_KEY || process.env.VITE_LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("AI is not configured yet. Configure LOVABLE_API_KEY no painel da Cloudflare.");
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    process.env.LOVABLE_API_KEY ||
+    process.env.VITE_LOVABLE_API_KEY;
+  if (!apiKey) throw new Error("AI is not configured yet. Configure GEMINI_API_KEY ou LOVABLE_API_KEY na Cloudflare.");
+
+  const isGemini =
+    Boolean(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) ||
+    apiKey.startsWith("AQ.") ||
+    apiKey.startsWith("AIza");
 
   const enriched = enrichAssetPrompt({
     kind: args.kind,
@@ -127,33 +136,56 @@ export async function generateGuiAsset(
       });
     }
 
-    const res = await fetch(
-      "https://ai.gateway.lovable.dev/v1/images/generations",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-pro-image",
-          messages: [{ role: "user", content }],
-          modalities: ["image", "text"],
-        }),
-      },
-    );
+    let b64: string | undefined;
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      if (res.status === 429)
-        throw new Error("Limite de uso atingido. Tente novamente em instantes.");
-      if (res.status === 402)
-        throw new Error("Créditos de IA esgotados. Adicione créditos para continuar.");
-      throw new Error(`Falha ao gerar a imagem: ${res.status} ${text}`);
+    if (isGemini) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instances: [{ prompt: enriched }],
+            parameters: { sampleCount: 1, aspectRatio: "1:1", outputMimeType: "image/png" },
+          }),
+        },
+      );
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Falha no Imagen/Gemini: ${res.status} ${text}`);
+      }
+      const payload = (await res.json()) as { predictions?: Array<{ bytesBase64Encoded?: string }> };
+      b64 = payload.predictions?.[0]?.bytesBase64Encoded;
+    } else {
+      const res = await fetch(
+        "https://ai.gateway.lovable.dev/v1/images/generations",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-pro-image",
+            messages: [{ role: "user", content }],
+            modalities: ["image", "text"],
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        if (res.status === 429)
+          throw new Error("Limite de uso atingido. Tente novamente em instantes.");
+        if (res.status === 402)
+          throw new Error("Créditos de IA esgotados. Adicione créditos para continuar.");
+        throw new Error(`Falha ao gerar a imagem: ${res.status} ${text}`);
+      }
+
+      const payload = (await res.json()) as { data?: Array<{ b64_json?: string }> };
+      b64 = payload.data?.[0]?.b64_json;
     }
 
-    const payload = (await res.json()) as { data?: Array<{ b64_json?: string }> };
-    const b64 = payload.data?.[0]?.b64_json;
     if (!b64) throw new Error("O modelo não retornou uma imagem.");
 
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));

@@ -8,7 +8,7 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
+import { createLovableAiGatewayProvider, createGeminiProvider } from "@/lib/ai-gateway.server";
 import { generateGuiAsset } from "@/lib/gui-generation.server";
 import { ASSET_KINDS, GUI_STYLES, GUI_ELEMENTS } from "@/lib/asset-kinds";
 
@@ -98,8 +98,21 @@ export const Route = createFileRoute("/api/chat")({
           .maybeSingle();
         if (!thread) return new Response("Thread not found", { status: 404 });
 
-        const apiKey = process.env.LOVABLE_API_KEY || process.env.VITE_LOVABLE_API_KEY;
-        if (!apiKey) return new Response("Missing LOVABLE_API_KEY em Variáveis de Ambiente da Cloudflare", { status: 500 });
+        const apiKey =
+          process.env.GEMINI_API_KEY ||
+          process.env.VITE_GEMINI_API_KEY ||
+          process.env.LOVABLE_API_KEY ||
+          process.env.VITE_LOVABLE_API_KEY;
+        if (!apiKey) return new Response("Missing AI API Key (GEMINI_API_KEY ou LOVABLE_API_KEY)", { status: 500 });
+
+        const isGeminiKey =
+          Boolean(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY) ||
+          apiKey.startsWith("AQ.") ||
+          apiKey.startsWith("AIza");
+
+        const aiModel = isGeminiKey
+          ? createGeminiProvider(apiKey)("gemini-2.0-flash")
+          : createLovableAiGatewayProvider(apiKey)("google/gemini-3.6-flash");
 
         const lastUser = [...messages].reverse().find((m) => m.role === "user");
         const lastUserText = lastUser
@@ -199,7 +212,7 @@ export const Route = createFileRoute("/api/chat")({
           : "";
 
         const result = streamText({
-          model: gateway("google/gemini-3.6-flash"),
+          model: aiModel,
           system: `${SYSTEM_PROMPT}${lastAssetContext}
 
 IMPORTANTE: escreva TODAS as suas respostas ao usuário em ${languageName}, independentemente do idioma em que ele escrever. Os prompts enviados para a ferramenta generate_asset continuam sempre em inglês.`,
