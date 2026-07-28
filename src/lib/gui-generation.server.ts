@@ -145,8 +145,8 @@ export async function generateGuiAsset(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
             Authorization: `Bearer ${apiKey}`,
-            "api-key": apiKey,
           },
           body: JSON.stringify({
             instances: [{ prompt: enriched }],

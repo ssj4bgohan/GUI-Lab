@@ -21,8 +21,8 @@ export function createGeminiProvider(apiKey: string) {
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
     apiKey,
     headers: {
+      "x-goog-api-key": apiKey,
       Authorization: `Bearer ${apiKey}`,
-      "api-key": apiKey,
     },
     queryParams: {
       key: apiKey,
