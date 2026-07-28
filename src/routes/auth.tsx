@@ -84,19 +84,46 @@ function AuthPage() {
         body: JSON.stringify({ username }),
       });
       const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        email?: string;
+        password?: string;
         username?: string;
-        tokenHash?: string;
         error?: string;
       };
-      if (!res.ok || !data.tokenHash) {
-        throw new Error(data.error || "Falha na verificação no servidor");
+
+      if (!res.ok || !data.email || !data.password) {
+        throw new Error(
+          data.error ||
+            "Não encontrei o código na descrição do seu perfil no Roblox. Cole o código no perfil, salve e tente de novo.",
+        );
       }
-      const { error } = await supabase.auth.verifyOtp({
-        type: "magiclink",
-        token_hash: data.tokenHash,
+
+      let { error: authErr } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
       });
-      if (error) throw error;
-      toast.success(`Bem-vindo, ${data.username || username}!`);
+
+      if (authErr) {
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email: data.email,
+          password: data.password,
+          options: {
+            data: {
+              full_name: data.username || username,
+            },
+          },
+        });
+        if (signUpErr && !signUpErr.message.toLowerCase().includes("already registered")) {
+          throw signUpErr;
+        }
+        const { error: secondLoginErr } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+        if (secondLoginErr) throw secondLoginErr;
+      }
+
+      toast.success(`Bem-vindo ao GUI Lab, ${data.username || username}!`);
       navigate({ to: "/chat" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha na verificação");
